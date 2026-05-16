@@ -62,11 +62,11 @@ query_params = st.query_params
 if "acao" in query_params:
     acao = query_params["acao"]
     
-    # Clientes
+    # Clientes: Cadastrar
     if acao == "cadastrar_cliente" and "nome" in query_params:
         executar_query("INSERT INTO clientes (nome, saldo_devedor) VALUES (?, 0.0)", (query_params["nome"],))
         
-    # Vendas
+    # Vendas: Lançar
     elif acao == "lancar_venda" and "produto_id" in query_params:
         p_id = int(query_params["produto_id"])
         qtd = int(query_params["qtd"])
@@ -85,14 +85,14 @@ if "acao" in query_params:
             else:
                 executar_query("INSERT INTO vendas (data, total, tipo, cliente_id) VALUES (datetime('now'), ?, 'A VISTA', NULL)", (total_venda,))
 
-    # PRODUTOS: CADASTRAR
+    # Produtos: Cadastrar
     elif acao == "cadastrar_produto":
         executar_query("""
             INSERT INTO produtos (nome, preco, quent_caixas, frio_unid, un_por_caixa, categoria) 
             VALUES (?, ?, ?, ?, ?, ?)
         """, (query_params["nome"], float(query_params["preco"]), int(query_params["quent"]), int(query_params["frio"]), int(query_params["un_cx"]), query_params["cat"]))
 
-    # PRODUTOS: EDITAR
+    # Produtos: Editar
     elif acao == "editar_produto":
         executar_query("""
             UPDATE produtos 
@@ -100,10 +100,11 @@ if "acao" in query_params:
             WHERE id = ?
         """, (query_params["nome"], float(query_params["preco"]), int(query_params["quent"]), int(query_params["frio"]), int(query_params["un_cx"]), query_params["cat"], int(query_params["id"])))
 
-    # PRODUTOS: EXCLUIR
+    # Produtos: Excluir
     elif acao == "excluir_produto":
         executar_query("DELETE FROM produtos WHERE id = ?", (int(query_params["id"]),))
 
+    # Limpa a URL e força o recarregamento limpo do Streamlit
     st.query_params.clear()
     st.rerun()
 
@@ -245,10 +246,8 @@ html_premium_ui = """
                 </div>
             </div>
 
-            <!-- ================= TELA 3: GESTÃO DE PRODUTOS (ESTOQUE, CADASTRO, EDIÇÃO, EXCLUSÃO) ================= -->
+            <!-- ================= TELA 3: GESTÃO DE PRODUTOS ================= -->
             <div id="tela-estoque" class="space-y-8 screen-content hidden">
-                
-                <!-- PAINEL DE FORMULÁRIO (CADASTRO / EDIÇÃO) -->
                 <div class="glass-panel rounded-2xl p-6 border border-gray-800/40">
                     <div class="flex items-center justify-between mb-6">
                         <div class="flex items-center gap-2">
@@ -297,7 +296,6 @@ html_premium_ui = """
                     </div>
                 </div>
 
-                <!-- TABELA DE GERENCIAMENTO DO ESTOQUE ATUAL -->
                 <div class="glass-panel rounded-2xl p-6 border border-gray-800/40">
                     <h3 class="text-sm font-bold tracking-wider uppercase text-gray-300 mb-4">Itens Cadastrados e Níveis de Estoque</h3>
                     <div class="overflow-x-auto">
@@ -325,9 +323,16 @@ html_premium_ui = """
         const produtos = __PRODUTOS_JSON__;
         const clientes = __CLIENTES_JSON__;
 
+        // Função universal para injetar comandos na janela principal (ignora travas de sandbox)
+        function executarAcaoGlobal(queryString) {
+            const baseUrl = window.top.location.href.split('?')[0];
+            window.top.location.href = baseUrl + queryString;
+        }
+
         function mudarAba(aba) {
             document.querySelectorAll('.screen-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('#sidebar-nav button').forEach(el => el.classList.remove('nav-link-active'));
+            localStorage.setItem('aba_ativa_bar', aba);
             
             if(aba === 'balcao') {
                 document.getElementById('tela-balcao').classList.remove('hidden');
@@ -350,18 +355,16 @@ html_premium_ui = """
             const tabelaFichas = document.getElementById('tabela_fichas_corpo');
             const tabelaProdutos = document.getElementById('tabela_produtos_corpo');
 
-            // Renderiza Dropdown Balcão
             produtos.forEach(p => {
                 selectProd.innerHTML += `<option value="${p.id}">🍺 ${p.nome} — R$ ${p.preco.toFixed(2)}</option>`;
             });
 
-            // Renderiza Dropdown Clientes e Fichas
             clientes.forEach(c => {
                 selectCli.innerHTML += `<option value="${c.id}">👤 Ficha: ${c.nome}</option>`;
                 tabelaFichas.innerHTML += `
                     <tr class="hover:bg-white/[0.01]">
                         <td class="py-3 px-4 font-semibold text-gray-200">${c.nome}</td>
-                        <td class="py-3 px-4 text-right font-bold ${c.saldo_devedor > 0 ? 'text-amber-400' : 'text-gray-500'}">R$ ${c.saldo_devedor.toFixed(2)}</td>
+                        <td class="py-3 px-4 text-right font-bold \${c.saldo_devedor > 0 ? 'text-amber-400' : 'text-gray-500'}">R$ \${c.saldo_devedor.toFixed(2)}</td>
                         <td class="py-3 px-4 text-center">
                             <button class="text-xs font-bold text-brandNeon bg-brandNeon/10 border border-brandNeon/20 px-3 py-1 rounded-lg hover:bg-brandNeon hover:text-black transition-all">Receber</button>
                         </td>
@@ -369,54 +372,35 @@ html_premium_ui = """
                 `;
             });
 
-            // Renderiza Catálogo Completo com botões de Ação
             produtos.forEach(p => {
                 tabelaProdutos.innerHTML += `
                     <tr class="hover:bg-white/[0.01]">
                         <td class="py-3 px-4 font-semibold text-gray-200">${p.nome}</td>
                         <td class="py-3 px-4 text-xs text-gray-500">${p.categoria}</td>
-                        <td class="py-3 px-4 text-right font-bold text-gray-300">R$ ${p.preco.toFixed(2)}</td>
-                        <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 bg-brandIce/10 text-brandIce text-xs rounded-md font-bold">${p.frio_unid} un</span></td>
-                        <td class="py-3 px-4 text-center"><span class="text-xs text-gray-400">${p.quent_caixas} Cx (${p.un_por_caixa} un/cx)</span></td>
+                        <td class="py-3 px-4 text-right font-bold text-gray-300">R$ \${p.preco.toFixed(2)}</td>
+                        <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 bg-brandIce/10 text-brandIce text-xs rounded-md font-bold">\${p.frio_unid} un</span></td>
+                        <td class="py-3 px-4 text-center"><span class="text-xs text-gray-400">\${p.quent_caixas} Cx (\${p.un_por_caixa} un/cx)</span></td>
                         <td class="py-3 px-4 text-center space-x-2">
-                            <button onclick="carregarProdutoEdicao(${p.id})" class="text-xs font-bold text-amber-400 bg-amber-400/10 hover:bg-amber-400 hover:text-black px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="excluirProduto(${p.id})" class="text-xs font-bold text-red-400 bg-red-400/10 hover:bg-red-400 hover:text-white px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-trash"></i></button>
+                            <button onclick="carregarProdutoEdicao(\${p.id})" class="text-xs font-bold text-amber-400 bg-amber-400/10 hover:bg-amber-400 hover:text-black px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="excluirProduto(\\${p.id})" class="text-xs font-bold text-red-400 bg-red-400/10 hover:bg-red-400 hover:text-white px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     </tr>
                 `;
             });
         }
 
-        // Operações de Produtos
-        function carregarProdutoEdicao(id) {
-            const p = produtos.find(prod => prod.id === id);
-            if (!p) return;
-            
-            document.getElementById('prod_id').value = p.id;
-            document.getElementById('prod_nome').value = p.nome;
-            document.getElementById('prod_preco').value = p.preco;
-            document.getElementById('prod_cat').value = p.categoria;
-            document.getElementById('prod_frio').value = p.frio_unid;
-            document.getElementById('prod_quent').value = p.quent_caixas;
-            document.getElementById('prod_un_cx').value = p.un_por_caixa;
-            
-            document.getElementById('form-produto-titulo').innerText = "Editar Parâmetros do Item";
-            document.getElementById('btn-cancelar-edicao').classList.remove('hidden');
-            document.getElementById('btn-salvar-prod').innerText = "Atualizar Registro";
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        // --- SUBMITS CORRIGIDOS COM EXECUTARACAOBLOBAL ---
+        function cadastrarCliente() {
+            const nome = document.getElementById('novo_cliente_nome').value;
+            if(!nome) return alert('Digite o nome do cliente!');
+            executarAcaoGlobal(`?acao=cadastrar_cliente&nome=\${encodeURIComponent(nome)}`);
         }
 
-        function limparFormProduto() {
-            document.getElementById('prod_id').value = "";
-            document.getElementById('prod_nome').value = "";
-            document.getElementById('prod_preco').value = "";
-            document.getElementById('prod_frio').value = "0";
-            document.getElementById('prod_quent').value = "0";
-            document.getElementById('prod_un_cx').value = "1";
-            
-            document.getElementById('form-produto-titulo').innerText = "Adicionar Produto ao Catálogo";
-            document.getElementById('btn-cancelar-edicao').classList.add('hidden');
-            document.getElementById('btn-salvar-prod').innerText = "Gravar no Catálogo";
+        function enviarVenda() {
+            const pId = document.getElementById('venda_produto').value;
+            const qtd = document.getElementById('venda_qtd').value;
+            const cId = document.getElementById('venda_cliente').value;
+            executarAcaoGlobal(`?acao=lancar_venda&produto_id=\${pId}&qtd=\${qtd}&cliente_id=\${cId}`);
         }
 
         function salvarProduto() {
@@ -431,41 +415,59 @@ html_premium_ui = """
             if(!nome || !preco) return alert("Preencha Nome e Preço!");
 
             const acao = id ? "editar_produto" : "cadastrar_produto";
-            window.parent.location.search = `?acao=${acao}&id=${id}&nome=${encodeURIComponent(nome)}&preco=${preco}&cat=${cat}&frio=${frio}&quent=${quent}&un_cx=${un_cx}`;
+            executarAcaoGlobal(`?acao=\${acao}&id=\${id}&nome=\${encodeURIComponent(nome)}&preco=\${preco}&cat=\${cat}&frio=\${frio}&quent=\${quent}&un_cx=\${un_cx}`);
         }
 
         function excluirProduto(id) {
             if(confirm("Tem certeza que deseja apagar este item permanentemente do catálogo?")) {
-                window.parent.location.search = `?acao=excluir_produto&id=${id}`;
+                executarAcaoGlobal(`?acao=excluir_produto&id=\${id}`);
             }
         }
 
-        // Fluxos Globais
-        function cadastrarCliente() {
-            const nome = document.getElementById('novo_cliente_nome').value;
-            if(!nome) return alert('Digite o nome!');
-            window.parent.location.search = `?acao=cadastrar_cliente&nome=${encodeURIComponent(nome)}`;
+        function carregarProdutoEdicao(id) {
+            const p = produtos.find(prod => prod.id === id);
+            if (!p) return;
+            document.getElementById('prod_id').value = p.id;
+            document.getElementById('prod_nome').value = p.nome;
+            document.getElementById('prod_preco').value = p.preco;
+            document.getElementById('prod_cat').value = p.categoria;
+            document.getElementById('prod_frio').value = p.frio_unid;
+            document.getElementById('prod_quent').value = p.quent_caixas;
+            document.getElementById('prod_un_cx').value = p.un_por_caixa;
+            document.getElementById('form-produto-titulo').innerText = "Editar Parâmetros do Item";
+            document.getElementById('btn-cancelar-edicao').classList.remove('hidden');
+            document.getElementById('btn-salvar-prod').innerText = "Atualizar Registro";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function enviarVenda() {
-            const pId = document.getElementById('venda_produto').value;
-            const qtd = document.getElementById('venda_qtd').value;
-            const cId = document.getElementById('venda_cliente').value;
-            window.parent.location.search = `?acao=lancar_venda&produto_id=${pId}&qtd=${qtd}&cliente_id=${cId}`;
+        function limparFormProduto() {
+            document.getElementById('prod_id').value = "";
+            document.getElementById('prod_nome').value = "";
+            document.getElementById('prod_preco').value = "";
+            document.getElementById('prod_frio').value = "0";
+            document.getElementById('prod_quent').value = "0";
+            document.getElementById('prod_un_cx').value = "1";
+            document.getElementById('form-produto-titulo').innerText = "Adicionar Produto ao Catálogo";
+            document.getElementById('btn-cancelar-edicao').classList.add('hidden');
+            document.getElementById('btn-salvar-prod').innerText = "Gravar no Catálogo";
         }
 
         setInterval(() => {
             document.getElementById('live-clock').innerText = new Date().toLocaleDateString('pt-BR') + ' — ' + new Date().toLocaleTimeString('pt-BR');
         }, 1000);
 
-        // Preservar aba aberta após refresh técnico
-        const params = new URLSearchParams(window.parent.location.search);
-        if (params.get('acao') && params.get('acao').includes('produto')) {
-            mudarAba('estoque');
-        } else {
-            mudarAba('balcao');
+        // Recuperação inteligente de estado da aba ativa usando localStorage
+        const params = new URLSearchParams(window.top.location.search);
+        const acaoAtual = params.get('acao');
+        
+        let abaPadrao = localStorage.getItem('aba_ativa_bar') || 'balcao';
+        
+        if (acaoAtual) {
+            if (acaoAtual.includes('cliente')) abaPadrao = 'fichas';
+            if (acaoAtual.includes('produto')) abaPadrao = 'estoque';
         }
         
+        mudarAba(abaPadrao);
         renderizarDados();
     </script>
 </body>
