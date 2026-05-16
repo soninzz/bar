@@ -62,7 +62,8 @@ produtos_json = prods_df.to_json(orient="records")
 clientes_json = clis_df.to_json(orient="records")
 
 # --- FRONT-END MAGNÍFICO (HTML5 + TAILWIND CSS + GLASSMORPHISM) ---
-html_premium_ui = f"""
+# Removemos o 'f' do início para evitar conflito de chaves do JS/CSS
+html_premium_ui = """
 <!DOCTYPE html>
 <html lang="pt-br" class="h-full">
 <head>
@@ -73,36 +74,36 @@ html_premium_ui = f"""
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-        tailwind.config = {{
-            theme: {{
-                extend: {{
-                    fontFamily: {{ sans: ['Plus Jakarta Sans', 'sans-serif'] }},
-                    colors: {{
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: {
                         darkBg: '#06080c',
                         panelBg: 'rgba(17, 22, 34, 0.65)',
                         borderGlow: '#1f293d',
                         brandNeon: '#10b981',
                         brandIce: '#06b6d4'
-                    }}
-                }}
-            }}
-        }}
+                    }
+                }
+            }
+        }
     </script>
     <style>
-        body {{ background-color: #06080c; color: #f3f4f6; overflow-x: hidden; }}
-        .glass-panel {{
+        body { background-color: #06080c; color: #f3f4f6; overflow-x: hidden; }
+        .glass-panel {
             background: rgba(13, 18, 30, 0.45);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.04);
-        }}
-        .neon-glow:hover {{
+        }
+        .neon-glow:hover {
             box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
             border-color: rgba(16, 185, 129, 0.3);
-        }}
-        ::-webkit-scrollbar {{ width: 6px; }}
-        ::-webkit-scrollbar-track {{ background: #06080c; }}
-        ::-webkit-scrollbar-thumb {{ background: #1f293d; border-radius: 10px; }}
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #06080c; }
+        ::-webkit-scrollbar-thumb { background: #1f293d; border-radius: 10px; }
     </style>
 </head>
 <body class="h-full antialiased selection:bg-brandNeon selection:text-black">
@@ -110,7 +111,7 @@ html_premium_ui = f"""
     <div class="flex h-screen overflow-hidden">
         
         <!-- SIDEBAR MINIMALISTA E CHIQUE -->
-        <div class="w-64 glass-panel border-r border-gray-800/40 flex flex-column justify-between p-6 hidden md:flex flex-col">
+        <div class="w-64 glass-panel border-r border-gray-800/40 flex flex-col justify-between p-6 hidden md:flex">
             <div>
                 <div class="flex items-center gap-3 px-2 mb-8">
                     <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brandNeon to-brandIce flex items-center justify-center shadow-lg shadow-brandNeon/10">
@@ -270,94 +271,97 @@ html_premium_ui = f"""
     </div>
 
     <script>
-        // Dados vindos direto do Python/SQLite de forma dinâmica
-        const produtos = {produtos_json};
-        const clientes = {clientes_json};
+        // Placeholders que serão substituídos pelo Python antes de renderizar
+        const produtos = __PRODUTOS_JSON__;
+        const clientes = __CLIENTES_JSON__;
 
         // Renderiza lista de produtos no select
         const selectProd = document.getElementById('input_produto');
-        produtos.forEach(p => {{
-            if(p.categoria === 'Cerveja') {{
-                selectProd.innerHTML += `<option value="${{p.id}}">🍺 ${{p.nome}} — R$ ${{p.preco.toFixed(2)}}</option>`;
-            }} else {{
-                selectProd.innerHTML += `<option value="${{p.id}}">🍬 ${{p.nome}} — R$ ${{p.preco.toFixed(2)}}</option>`;
-            }}
-        }});
+        produtos.forEach(p => {
+            if(p.categoria === 'Cerveja') {
+                selectProd.innerHTML += `<option value="${p.id}">🍺 ${p.nome} — R$ ${p.preco.toFixed(2)}</option>`;
+            } else {
+                selectProd.innerHTML += `<option value="${p.id}">🍬 ${p.nome} — R$ ${p.preco.toFixed(2)}</option>`;
+            }
+        });
 
         // Renderiza lista de clientes no select
         const selectCli = document.getElementById('input_cliente');
-        clientes.forEach(c => {{
-            selectCli.innerHTML += `<option value="${{c.id}}">👤 Ficha: ${{c.nome}}</option>`;
-        }});
+        clientes.forEach(c => {
+            selectCli.innerHTML += `<option value="${c.id}">👤 Ficha: ${c.nome}</option>`;
+        });
 
         // Renderiza Tabela de Fichas
         const tabelaFichas = document.getElementById('tabela_fichas');
-        clientes.forEach(c => {{
+        clientes.forEach(c => {
             const badgeRisco = c.saldo_devedor > 100 ? 
                 `<span class="text-[9px] px-2 py-0.5 bg-red-500/10 text-red-400 font-bold rounded-md border border-red-500/20">RETENÇÃO</span>` : 
                 `<span class="text-[9px] px-2 py-0.5 bg-brandNeon/10 text-brandNeon font-bold rounded-md border border-brandNeon/20">ESTÁVEL</span>`;
                 
             tabelaFichas.innerHTML += `
                 <tr class="hover:bg-white/[0.01] transition-all">
-                    <td class="py-3 px-4 font-semibold text-gray-200">${{c.nome}}</td>
-                    <td class="py-3 px-4 text-right font-bold text-amber-400">R$ ${{c.saldo_devedor.toFixed(2)}}</td>
-                    <td class="py-3 px-4 text-center">${{badgeRisco}}</td>
+                    <td class="py-3 px-4 font-semibold text-gray-200">${c.nome}</td>
+                    <td class="py-3 px-4 text-right font-bold text-amber-400">R$ ${c.saldo_devedor.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-center">${badgeRisco}</td>
                 </tr>
             `;
-        }});
+        });
 
         // Renderiza Controle de Cervejeira (Frio)
         const gridFrio = document.getElementById('grid_frio');
-        produtos.forEach(p => {{
+        produtos.forEach(p => {
             const statusCor = p.frio_unid <= 10 ? 'text-red-400 font-bold' : 'text-brandIce';
             const alertBg = p.frio_unid <= 10 ? 'bg-red-500/10 border-red-500/20' : 'bg-white/5 border-gray-800';
             
             gridFrio.innerHTML += `
-                <div class="p-3 rounded-xl border flex justify-between items-center ${{alertBg}}">
+                <div class="p-3 rounded-xl border flex justify-between items-center ${alertBg}">
                     <div>
-                        <p class="text-xs font-semibold text-gray-300">${{p.nome}}</p>
-                        <span class="text-[10px] text-gray-500">Giro recomendado: +${{p.un_por_caixa}} un</span>
+                        <p class="text-xs font-semibold text-gray-300">${p.nome}</p>
+                        <span class="text-[10px] text-gray-500">Giro recomendado: +${p.un_por_caixa} un</span>
                     </div>
                     <div class="text-right">
-                        <span class="text-sm font-bold tracking-tight px-2 py-1 rounded-lg bg-black/40 ${{statusCor}}">${{p.frio_unid}} un</span>
+                        <span class="text-sm font-bold tracking-tight px-2 py-1 rounded-lg bg-black/40 ${statusCor}">${p.frio_unid} un</span>
                     </div>
                 </div>
             `;
-        }});
+        });
 
         // Renderiza Depósito (Quente)
         const gridQuente = document.getElementById('grid_quente');
-        produtos.forEach(p => {{
-            if(p.quent_caixas > 0 || p.un_por_caixa > 1) {{
+        produtos.forEach(p => {
+            if(p.quent_caixas > 0 || p.un_por_caixa > 1) {
                 gridQuente.innerHTML += `
                     <div class="flex justify-between items-center border-b border-gray-800/40 pb-2">
-                        <span class="text-gray-400 text-xs">${{p.nome}}</span>
-                        <span class="font-bold text-gray-200 bg-white/5 px-2 py-0.5 rounded">${{p.quent_caixas}} Cx</span>
+                        <span class="text-gray-400 text-xs">${p.nome}</span>
+                        <span class="font-bold text-gray-200 bg-white/5 px-2 py-0.5 rounded">${p.quent_caixas} Cx</span>
                     </div>
                 `;
-            }}
-        }});
+            }
+        });
 
         // Relógio Operacional Live
-        function clock() {{
+        function clock() {
             const now = new Date();
             document.getElementById('live-clock').innerText = now.toLocaleDateString('pt-BR') + ' — ' + now.toLocaleTimeString('pt-BR');
         }
         setInterval(clock, 1000);
         clock();
 
-        function executarLancamento() {{
+        function ejecutarLancamento() {
             alert("Operação enviada ao backend! Dados sincronizados no Banco de Dados.");
-        }}
+        }
 
-        function dispararFechamento() {{
+        function dispararFechamento() {
             document.getElementById('box_ia').classList.remove('hidden');
             document.getElementById('conteudo_ia').innerHTML = "<b>Análise Preditiva Celestia:</b><br>• Lucratividade Operacional estimada em 42% hoje.<br>• Alerta: Heineken Long Neck atingiu o limite crítico na geladeira.<br>• Fluxo Financeiro estável, porém 2 fichas necessitam de conciliação ativa.";
-        }}
+        }
     </script>
 </body>
 </html>
 """
 
-# Renderização do Dashboard Magnífico ocupando a tela de ponta a ponta
-components.html(html_premium_ui, height=950, scrolling=True)
+# Injetamos os dados usando replace seguro, sem quebrar as chaves do front-end
+html_final = html_premium_ui.replace("__PRODUTOS_JSON__", produtos_json).replace("__CLIENTES_JSON__", clientes_json)
+
+# Renderização final de ponta a ponta
+components.html(html_final, height=950, scrolling=True)
