@@ -1406,6 +1406,3 @@ init();
 </body>
 </html>
 """
-
-
-components.html(html_final, height=950, scrolling=False)
