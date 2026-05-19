@@ -18,6 +18,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─── DATABASE ─────────────────────────────────────────────────────────────────
+# Usa /tmp para garantir escrita no Streamlit Cloud
 DB = os.path.join("/tmp", "bar_querido.db")
 
 def get_conn():
@@ -123,7 +124,7 @@ if "acao" in qp:
                 preco_p = float(p.iloc[0]['preco'])
                 total   = preco_p * qtd
                 run_query("UPDATE produtos SET frio_unid = MAX(0, frio_unid - ?) WHERE id=?", (qtd, p_id))
-                if c_id != "AVULSO" and tipo == "FIADO":
+                if c_id != "AVULSO":
                     run_query("INSERT INTO consumos(cliente_id,produto_id,produto_nome,produto_preco,qtd,total,tipo,pago,observacao) VALUES(?,?,?,?,?,?,'FIADO',0,?)",
                         (int(c_id), p_id, nome_p, preco_p, qtd, total, obs))
                 else:
@@ -214,6 +215,7 @@ clis           = fetch_df("SELECT * FROM clientes WHERE ativo=1 ORDER BY nome")
 historico_raw  = fetch_df("SELECT id as consumo_id, cliente_id, produto_nome, produto_preco, qtd, total, tipo, pago, data, observacao FROM consumos ORDER BY data DESC")
 pagamentos_raw = fetch_df("SELECT id, cliente_id, valor, data, observacao FROM pagamentos ORDER BY data DESC")
 
+# Saldo devedor calculado em Python
 def saldo_devedor(cid, hist_df):
     if hist_df.empty:
         return 0.0
@@ -224,6 +226,7 @@ clis_com_saldo = clis.copy()
 clis_com_saldo['devendo'] = clis_com_saldo['id'].apply(lambda x: saldo_devedor(x, historico_raw))
 
 def to_json(df):
+    """Serializa DataFrame para JSON JavaScript-safe."""
     records = []
     for row in df.to_dict(orient='records'):
         clean = {}
@@ -405,6 +408,7 @@ td.re{color:var(--red);font-weight:700}
     </div>
     <div class="content">
 
+      <!-- BALCAO -->
       <div class="screen active" id="scr-balcao">
         <div class="stats" id="stats-balcao"></div>
         <div class="g2" style="align-items:start">
@@ -447,6 +451,7 @@ td.re{color:var(--red);font-weight:700}
         </div>
       </div>
 
+      <!-- FICHAS -->
       <div class="screen" id="scr-fichas">
         <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
           <button class="btn btn-gold" onclick="openMod('mod-nc')"><i class="fa-solid fa-user-plus"></i> Nova Ficha</button>
@@ -458,6 +463,7 @@ td.re{color:var(--red);font-weight:700}
         <div id="lista-cli" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
       </div>
 
+      <!-- ESTOQUE -->
       <div class="screen" id="scr-estoque">
         <div class="tab-bar">
           <button class="tab active" id="t-cat" onclick="setEtab('cat')">Catalogo</button>
@@ -501,6 +507,7 @@ td.re{color:var(--red);font-weight:700}
         </div>
       </div>
 
+      <!-- RELATORIO -->
       <div class="screen" id="scr-relatorio">
         <div class="stats" id="stats-rel"></div>
         <div class="g2" style="gap:20px;margin-bottom:20px">
@@ -517,6 +524,7 @@ td.re{color:var(--red);font-weight:700}
   </main>
 </div>
 
+<!-- MODAL: Novo Cliente -->
 <div class="modal-ov" id="mod-nc">
   <div class="modal">
     <div class="modal-hd">
@@ -532,6 +540,7 @@ td.re{color:var(--red);font-weight:700}
   </div>
 </div>
 
+<!-- MODAL: Ficha -->
 <div class="modal-ov" id="mod-ficha">
   <div class="modal" style="width:620px">
     <div class="modal-hd">
@@ -603,10 +612,7 @@ function setScr(s, save=true) {
   if(save){try{localStorage.setItem('bar_scr',s)}catch(e){}}
 }
 
-// ALTERADO: Atualiza o topo (parent window) forçando o reload correto com os query params do Streamlit
-function nav(p){
-  window.top.location.href = window.top.location.origin + window.top.location.pathname + '?' + p;
-}
+function nav(p){window.parent.location.search='?'+p}
 
 function fM(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fD(s){if(!s)return'-';const d=new Date((s+'').replace(' ','T'));return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
@@ -628,6 +634,7 @@ function toast(msg,t='green'){
   setTimeout(()=>el.remove(),3500);
 }
 
+// ── SELECTS
 function fillProdSel(id){
   const s=document.getElementById(id);if(!s)return;
   s.innerHTML='<option value="">-- Selecione --</option>';
@@ -639,6 +646,7 @@ function fillCliSel(id){
   clientes.forEach(c=>{const d=devendo(c.id);s.innerHTML+=`<option value="${c.id}">&#128100; ${c.nome}${d>0?' -- deve '+fM(d):''}</option>`});
 }
 
+// ── BALCAO
 function setTipo(t){
   tipoVenda=t;
   document.getElementById('btn-avista').className=t==='A_VISTA'?'btn btn-gold':'btn btn-ghost';
@@ -685,6 +693,7 @@ function renderRecentes(){
     <div class="stat cyan"><div class="stat-lbl">Clientes Ativos</div><div class="stat-val">${clientes.length}</div><div class="stat-sub">fichas</div></div>`;
 }
 
+// ── FICHAS
 function updBadge(){
   const n=clientes.filter(c=>devendo(c.id)>0).length;
   const b=document.getElementById('badge-fichas');
@@ -771,6 +780,7 @@ function regPgto(){
   nav(`acao=registrar_pagamento&cliente_id=${fichaId}&valor=${v}&obs=${encodeURIComponent(o)}`);
 }
 
+// ── ESTOQUE
 function setEtab(t){
   ['cat','rep','new'].forEach(x=>{
     document.getElementById('et-'+x).style.display=x===t?'block':'none';
@@ -856,6 +866,7 @@ function reporEst(){
   nav(`acao=repor_estoque&id=${id}&frio=${fr}&quent=${qu}`);
 }
 
+// ── RELATORIO
 function renderRel(){
   const tG=historico.reduce((s,h)=>s+h.total,0);
   const tAV=historico.filter(h=>h.tipo==='A_VISTA').reduce((s,h)=>s+h.total,0);
@@ -896,6 +907,7 @@ function renderRel(){
     </tr>`}).join('');
 }
 
+// ── INIT
 function init(){
   fillProdSel('v-prod');fillProdSel('rep-prod');
   fillCliSel('v-cli');
@@ -907,7 +919,7 @@ function init(){
   updBadge();
   let s='balcao';try{s=localStorage.getItem('bar_scr')||'balcao'}catch(e){}
   setScr(s,false);
-  setInterval(()=>{const d=new Date();document.getElementById('clk').innerText=d.toLocaleDateString('pt-BR')+' - '+d.toLocaleTimeString('pt-BR'),1000);
+  setInterval(()=>{const d=new Date();document.getElementById('clk').innerText=d.toLocaleDateString('pt-BR')+' - '+d.toLocaleTimeString('pt-BR')},1000);
 }
 
 init();
