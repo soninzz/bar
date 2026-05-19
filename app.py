@@ -1407,11 +1407,5 @@ init();
 </html>
 """
 
-html_final = (HTML
-    .replace("__PRODUTOS_JSON__", produtos_json)
-    .replace("__CLIENTES_JSON__", clis_json)
-    .replace("__HISTORICO_JSON__", historico_json)
-    .replace("__PAGAMENTOS_JSON__", pagamentos_json)
-)
 
 components.html(html_final, height=950, scrolling=False)
