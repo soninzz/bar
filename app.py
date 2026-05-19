@@ -218,40 +218,56 @@ if "acao" in qp:
     st.rerun()
 
 # ─── LOAD DATA ────────────────────────────────────────────────────────────────
-prods   = fetch("SELECT * FROM produtos WHERE ativo=1 ORDER BY categoria, nome")
-clis    = fetch("SELECT * FROM clientes WHERE ativo=1 ORDER BY nome")
+prods = fetch("SELECT * FROM produtos WHERE ativo=1 ORDER BY categoria, nome")
+clis  = fetch("SELECT * FROM clientes WHERE ativo=1 ORDER BY nome")
 
-# saldos por cliente
-saldos_df = fetch("""
-    SELECT cliente_id,
-           COALESCE(SUM(CASE WHEN pago=0 THEN total ELSE 0 END),0) AS devendo
-    FROM consumos
-    WHERE tipo='FIADO'
-    GROUP BY cliente_id
-""")
-pgtos_df  = fetch("SELECT cliente_id, COALESCE(SUM(valor),0) AS pago FROM pagamentos GROUP BY cliente_id")
-
-clis_com_saldo = clis.copy()
-clis_com_saldo = clis_com_saldo.merge(saldos_df, left_on='id', right_on='cliente_id', how='left')
-clis_com_saldo['devendo'] = clis_com_saldo['devendo'].fillna(0)
-
-# historico completo por cliente
 historico_raw = fetch("""
-    SELECT c.id as consumo_id, c.cliente_id, c.produto_nome, c.produto_preco,
-           c.qtd, c.total, c.tipo, c.pago, c.data, c.observacao
-    FROM consumos c
-    ORDER BY c.data DESC
+    SELECT id as consumo_id, cliente_id, produto_nome, produto_preco,
+           qtd, total, tipo, pago, data, observacao
+    FROM consumos
+    ORDER BY data DESC
 """)
 pagamentos_raw = fetch("""
-    SELECT p.id, p.cliente_id, p.valor, p.data, p.observacao
-    FROM pagamentos p
-    ORDER BY p.data DESC
+    SELECT id, cliente_id, valor, data, observacao
+    FROM pagamentos
+    ORDER BY data DESC
 """)
 
-prods_json       = prods.to_json(orient="records")
-clis_json        = clis_com_saldo.to_json(orient="records")
-historico_json   = historico_raw.to_json(orient="records")
-pagamentos_json  = pagamentos_raw.to_json(orient="records")
+# Calcular saldo devedor por cliente direto no Python (evita problemas de merge)
+def saldo_cliente(cid):
+    if historico_raw.empty:
+        return 0.0
+    mask = (historico_raw['cliente_id'] == cid) & \
+           (historico_raw['tipo'] == 'FIADO') & \
+           (historico_raw['pago'] == 0)
+    return float(historico_raw.loc[mask, 'total'].sum())
+
+clis_com_saldo = clis.copy()
+clis_com_saldo['devendo'] = clis_com_saldo['id'].apply(saldo_cliente)
+
+# Garantir que não há NaN nos DataFrames antes de serializar
+prods = prods.fillna('')
+clis_com_saldo = clis_com_saldo.fillna('')
+historico_raw = historico_raw.fillna('')
+pagamentos_raw = pagamentos_raw.fillna('')
+
+import json as _json
+
+def df_to_json_safe(df):
+    """Converte DataFrame para JSON tratando tipos especiais."""
+    records = df.to_dict(orient='records')
+    for row in records:
+        for k, v in row.items():
+            if hasattr(v, 'item'):          # numpy scalar → python nativo
+                row[k] = v.item()
+            elif v != v:                    # NaN check
+                row[k] = None
+    return _json.dumps(records, ensure_ascii=False)
+
+prods_json      = df_to_json_safe(prods)
+clis_json       = df_to_json_safe(clis_com_saldo)
+historico_json  = df_to_json_safe(historico_raw)
+pagamentos_json = df_to_json_safe(pagamentos_raw)
 
 # ─── HTML UI ─────────────────────────────────────────────────────────────────
 HTML = r"""
