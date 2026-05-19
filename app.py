@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import sqlite3
 import pandas as pd
-import json
 
 # --- CONFIGURAÇÃO DA VITRINE ---
 st.set_page_config(page_title="Bar do Querido — Hub", layout="wide", initial_sidebar_state="collapsed")
@@ -62,11 +61,9 @@ query_params = st.query_params
 if "acao" in query_params:
     acao = query_params["acao"]
     
-    # Clientes: Cadastrar
     if acao == "cadastrar_cliente" and "nome" in query_params:
         executar_query("INSERT INTO clientes (nome, saldo_devedor) VALUES (?, 0.0)", (query_params["nome"],))
         
-    # Vendas: Lançar
     elif acao == "lancar_venda" and "produto_id" in query_params:
         p_id = int(query_params["produto_id"])
         qtd = int(query_params["qtd"])
@@ -85,14 +82,12 @@ if "acao" in query_params:
             else:
                 executar_query("INSERT INTO vendas (data, total, tipo, cliente_id) VALUES (datetime('now'), ?, 'A VISTA', NULL)", (total_venda,))
 
-    # Produtos: Cadastrar
     elif acao == "cadastrar_produto":
         executar_query("""
             INSERT INTO produtos (nome, preco, quent_caixas, frio_unid, un_por_caixa, categoria) 
             VALUES (?, ?, ?, ?, ?, ?)
         """, (query_params["nome"], float(query_params["preco"]), int(query_params["quent"]), int(query_params["frio"]), int(query_params["un_cx"]), query_params["cat"]))
 
-    # Produtos: Editar
     elif acao == "editar_produto":
         executar_query("""
             UPDATE produtos 
@@ -100,11 +95,10 @@ if "acao" in query_params:
             WHERE id = ?
         """, (query_params["nome"], float(query_params["preco"]), int(query_params["quent"]), int(query_params["frio"]), int(query_params["un_cx"]), query_params["cat"], int(query_params["id"])))
 
-    # Produtos: Excluir
     elif acao == "excluir_produto":
         executar_query("DELETE FROM produtos WHERE id = ?", (int(query_params["id"]),))
 
-    # Limpa a URL e força o recarregamento limpo do Streamlit
+    # Força atualização limpa
     st.query_params.clear()
     st.rerun()
 
@@ -146,7 +140,6 @@ html_premium_ui = """
 
     <div class="flex h-screen overflow-hidden">
         
-        <!-- SIDEBAR -->
         <div class="w-64 glass-panel border-r border-gray-800/40 flex flex-col justify-between p-6">
             <div>
                 <div class="flex items-center gap-3 px-2 mb-8">
@@ -173,7 +166,6 @@ html_premium_ui = """
             </div>
         </div>
 
-        <!-- CONTEÚDO -->
         <div class="flex-1 overflow-y-auto p-8">
             
             <div class="flex justify-between items-center mb-8">
@@ -186,7 +178,6 @@ html_premium_ui = """
                 </div>
             </div>
 
-            <!-- ================= TELA 1: BALCÃO ================= -->
             <div id="tela-balcao" class="space-y-8 screen-content">
                 <div class="glass-panel rounded-2xl p-6 border border-gray-800/40">
                     <div class="flex items-center gap-2 mb-6">
@@ -217,7 +208,6 @@ html_premium_ui = """
                 </div>
             </div>
 
-            <!-- ================= TELA 2: FICHAS ================= -->
             <div id="tela-fichas" class="space-y-8 screen-content hidden">
                 <div class="glass-panel rounded-2xl p-6 border border-gray-800/40">
                     <div class="flex items-center gap-2 mb-4">
@@ -246,7 +236,6 @@ html_premium_ui = """
                 </div>
             </div>
 
-            <!-- ================= TELA 3: GESTÃO DE PRODUTOS ================= -->
             <div id="tela-estoque" class="space-y-8 screen-content hidden">
                 <div class="glass-panel rounded-2xl p-6 border border-gray-800/40">
                     <div class="flex items-center justify-between mb-6">
@@ -323,16 +312,11 @@ html_premium_ui = """
         const produtos = __PRODUTOS_JSON__;
         const clientes = __CLIENTES_JSON__;
 
-        // Função universal para injetar comandos na janela principal (ignora travas de sandbox)
-        function executarAcaoGlobal(queryString) {
-            const baseUrl = window.top.location.href.split('?')[0];
-            window.top.location.href = baseUrl + queryString;
-        }
-
         function mudarAba(aba) {
             document.querySelectorAll('.screen-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('#sidebar-nav button').forEach(el => el.classList.remove('nav-link-active'));
-            localStorage.setItem('aba_ativa_bar', aba);
+            
+            try { localStorage.setItem('aba_ativa_bar', aba); } catch(e) {}
             
             if(aba === 'balcao') {
                 document.getElementById('tela-balcao').classList.remove('hidden');
@@ -364,7 +348,7 @@ html_premium_ui = """
                 tabelaFichas.innerHTML += `
                     <tr class="hover:bg-white/[0.01]">
                         <td class="py-3 px-4 font-semibold text-gray-200">${c.nome}</td>
-                        <td class="py-3 px-4 text-right font-bold \${c.saldo_devedor > 0 ? 'text-amber-400' : 'text-gray-500'}">R$ \${c.saldo_devedor.toFixed(2)}</td>
+                        <td class="py-3 px-4 text-right font-bold ${c.saldo_devedor > 0 ? 'text-amber-400' : 'text-gray-500'}">R$ ${c.saldo_devedor.toFixed(2)}</td>
                         <td class="py-3 px-4 text-center">
                             <button class="text-xs font-bold text-brandNeon bg-brandNeon/10 border border-brandNeon/20 px-3 py-1 rounded-lg hover:bg-brandNeon hover:text-black transition-all">Receber</button>
                         </td>
@@ -377,30 +361,30 @@ html_premium_ui = """
                     <tr class="hover:bg-white/[0.01]">
                         <td class="py-3 px-4 font-semibold text-gray-200">${p.nome}</td>
                         <td class="py-3 px-4 text-xs text-gray-500">${p.categoria}</td>
-                        <td class="py-3 px-4 text-right font-bold text-gray-300">R$ \${p.preco.toFixed(2)}</td>
-                        <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 bg-brandIce/10 text-brandIce text-xs rounded-md font-bold">\${p.frio_unid} un</span></td>
-                        <td class="py-3 px-4 text-center"><span class="text-xs text-gray-400">\${p.quent_caixas} Cx (\${p.un_por_caixa} un/cx)</span></td>
+                        <td class="py-3 px-4 text-right font-bold text-gray-300">R$ ${p.preco.toFixed(2)}</td>
+                        <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 bg-brandIce/10 text-brandIce text-xs rounded-md font-bold">${p.frio_unid} un</span></td>
+                        <td class="py-3 px-4 text-center"><span class="text-xs text-gray-400">${p.quent_caixas} Cx (${p.un_por_caixa} un/cx)</span></td>
                         <td class="py-3 px-4 text-center space-x-2">
-                            <button onclick="carregarProdutoEdicao(\${p.id})" class="text-xs font-bold text-amber-400 bg-amber-400/10 hover:bg-amber-400 hover:text-black px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="excluirProduto(\\${p.id})" class="text-xs font-bold text-red-400 bg-red-400/10 hover:bg-red-400 hover:text-white px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-trash"></i></button>
+                            <button onclick="carregarProdutoEdicao(${p.id})" class="text-xs font-bold text-amber-400 bg-amber-400/10 hover:bg-amber-400 hover:text-black px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="excluirProduto(${p.id})" class="text-xs font-bold text-red-400 bg-red-400/10 hover:bg-red-400 hover:text-white px-2.5 py-1 rounded transition-all"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     </tr>
                 `;
             });
         }
 
-        // --- SUBMITS CORRIGIDOS COM EXECUTARACAOBLOBAL ---
+        // --- ENVIOS CORRIGIDOS PARA O PYTHON ---
         function cadastrarCliente() {
             const nome = document.getElementById('novo_cliente_nome').value;
             if(!nome) return alert('Digite o nome do cliente!');
-            executarAcaoGlobal(`?acao=cadastrar_cliente&nome=\${encodeURIComponent(nome)}`);
+            window.parent.location.search = `?acao=cadastrar_cliente&nome=${encodeURIComponent(nome)}`;
         }
 
         function enviarVenda() {
             const pId = document.getElementById('venda_produto').value;
             const qtd = document.getElementById('venda_qtd').value;
             const cId = document.getElementById('venda_cliente').value;
-            executarAcaoGlobal(`?acao=lancar_venda&produto_id=\${pId}&qtd=\${qtd}&cliente_id=\${cId}`);
+            window.parent.location.search = `?acao=lancar_venda&produto_id=${pId}&qtd=${qtd}&cliente_id=${cId}`;
         }
 
         function salvarProduto() {
@@ -415,12 +399,12 @@ html_premium_ui = """
             if(!nome || !preco) return alert("Preencha Nome e Preço!");
 
             const acao = id ? "editar_produto" : "cadastrar_produto";
-            executarAcaoGlobal(`?acao=\${acao}&id=\${id}&nome=\${encodeURIComponent(nome)}&preco=\${preco}&cat=\${cat}&frio=\${frio}&quent=\${quent}&un_cx=\${un_cx}`);
+            window.parent.location.search = `?acao=${acao}&id=${id}&nome=${encodeURIComponent(nome)}&preco=${preco}&cat=${cat}&frio=${frio}&quent=${quent}&un_cx=${un_cx}`;
         }
 
         function excluirProduto(id) {
             if(confirm("Tem certeza que deseja apagar este item permanentemente do catálogo?")) {
-                executarAcaoGlobal(`?acao=excluir_produto&id=\${id}`);
+                window.parent.location.search = `?acao=excluir_produto&id=${id}`;
             }
         }
 
@@ -456,16 +440,9 @@ html_premium_ui = """
             document.getElementById('live-clock').innerText = new Date().toLocaleDateString('pt-BR') + ' — ' + new Date().toLocaleTimeString('pt-BR');
         }, 1000);
 
-        // Recuperação inteligente de estado da aba ativa usando localStorage
-        const params = new URLSearchParams(window.top.location.search);
-        const acaoAtual = params.get('acao');
-        
-        let abaPadrao = localStorage.getItem('aba_ativa_bar') || 'balcao';
-        
-        if (acaoAtual) {
-            if (acaoAtual.includes('cliente')) abaPadrao = 'fichas';
-            if (acaoAtual.includes('produto')) abaPadrao = 'estoque';
-        }
+        // Inicialização protegida
+        let abaPadrao = 'balcao';
+        try { abaPadrao = localStorage.getItem('aba_ativa_bar') || 'balcao'; } catch(e) {}
         
         mudarAba(abaPadrao);
         renderizarDados();
